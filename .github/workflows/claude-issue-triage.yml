@@ -66,6 +66,11 @@ jobs:
                (this edits your own previous comment on this issue if one exists,
                instead of creating a new one each time the issue is edited).
 
+               The comment body must be written in Markdown that GitHub can
+               render (headings/bold via `**Section**`, inline code via
+               backticks, lists with `-`), since it is posted directly as a
+               GitHub issue comment.
+
                The comment must be written for a developer who will implement the
                fix later, and must include these sections:
                  - **Summary** — one or two sentences restating the problem.
