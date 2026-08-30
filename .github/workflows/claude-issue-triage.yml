@@ -1,0 +1,91 @@
+name: Claude Issue Triage
+
+on:
+  issues:
+    types: [opened, edited]
+
+concurrency:
+  group: claude-issue-triage-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code Issue Triage
+        id: claude-triage
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+          # Permite que el triage corra también sobre issues abiertos por
+          # usuarios sin acceso de escritura al repo.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          allowed_non_write_users: '*'
+
+          prompt: |
+            You are triaging a GitHub issue on the "claude-tetris" repository
+            (a vanilla JS Tetris game: index.html, style.css, game.js).
+
+            Issue #${{ github.event.issue.number }}: "${{ github.event.issue.title }}"
+
+            Body:
+            ${{ github.event.issue.body }}
+
+            Do the following:
+
+            1. Read game.js and CLAUDE.md (and index.html/style.css if relevant) to
+               understand the board model, piece definitions, collision/wall-kick
+               logic, game loop, locking/scoring, ghost piece, and input handling,
+               so you can accurately relate the issue to the actual code.
+
+            2. Choose zero or more labels that apply, from this exact set only
+               (do not invent new labels): bug, documentation, duplicate,
+               enhancement, good first issue, help wanted, invalid, question,
+               wontfix, accessibility.
+               - First check the issue's current labels with:
+                 gh issue view ${{ github.event.issue.number }} --json labels
+               - Only ADD labels that aren't already present; never remove any
+                 existing label.
+               - If you're not confident a label applies, leave it out.
+               - Apply with: gh issue edit ${{ github.event.issue.number }} \
+                   --add-label "label-one,label-two"
+
+            3. Post exactly one diagnostic comment for the issue using:
+                 gh issue comment ${{ github.event.issue.number }} --edit-last \
+                   --create-if-none --body "..."
+               (this edits your own previous comment on this issue if one exists,
+               instead of creating a new one each time the issue is edited).
+
+               The comment must be written for a developer who will implement the
+               fix later, and must include these sections:
+                 - **Summary** — one or two sentences restating the problem.
+                 - **Likely root cause / affected area** — point to specific
+                   file(s) and function(s) (e.g. `game.js: collides()`),
+                   referencing CLAUDE.md concepts (board model, wall kicks,
+                   locking, ghost piece, input handling) where relevant. If the
+                   issue is not a code bug (e.g. a question, duplicate, or
+                   invalid report), say so plainly instead of forcing a
+                   root-cause guess.
+                 - **Suggested approach** — a short, actionable starting point
+                   for the fix or next step (not a full implementation).
+                 - **Labels applied** — list what you added in step 2, or "none".
+               End with one line noting this is an automated analysis and should
+               be verified by a human before implementing.
+
+            Only use `gh issue view`, `gh issue edit`, and `gh issue comment` to
+            interact with GitHub. Do not modify the issue's title or body, do not
+            close it, and do not touch any other issue, PR, or file.
+
+          claude_args: |
+            --allowedTools "Read,Grep,Glob,Bash(gh issue view:*),Bash(gh issue edit:*),Bash(gh issue comment:*)"
+            --max-turns 15
